@@ -15,7 +15,7 @@ params.chocophlan="full"
 
 process fasterq_dump {
     cpus 8
-    publishDir "${params.publish_dir}"
+    memory "16g"
 
     tag "$srr"
     
@@ -40,6 +40,7 @@ process fasterq_dump {
 
 process concat_fastq {
     cpus 1
+    memory "1g"
 
     input:
       path x
@@ -48,14 +49,16 @@ process concat_fastq {
       path 'wordcount.fastq'
     script:
       """
-      cat $x >> out.fastq
-      wc ${x} > wordcount.fastq
+      ls -lah .
+      echo ${x}
+      cat ${x} >> out.fastq
+      wc out.fastq > wordcount.fastq
       """
 }
 
 
 process install_metaphlan_db {
-    cpus 8
+    cpus 1
     memory '32g'
     
     storeDir "${params.store_dir}"
@@ -72,6 +75,7 @@ process install_metaphlan_db {
 process metaphlan_bugs_list {
     publishDir "${params.publish_dir}/metaphlan"
 
+    time "1d"
     cpus 8
     memory "32g"
     
@@ -107,6 +111,7 @@ process metaphlan_markers {
     publishDir "${params.publish_dir}/metaphlan"
 
     cpus 8
+    memory "32g"
     
     input:
     path metaphlan_bt2
@@ -135,6 +140,10 @@ process metaphlan_markers {
 
 
 process chocophlan_db {
+    cpus 1
+    memory "1g"
+    time "1d"
+
     storeDir "${params.store_dir}"
 
     output:
@@ -142,27 +151,33 @@ process chocophlan_db {
 
     script:
     """
-    humann_databases --download chocophlan ${params.chocophlan} .
+    humann_databases --update-config no --download chocophlan ${params.chocophlan} .
     """
 }
 
 
 process uniref_db {
+    cpus 1
+    memory "1g"
+    time "1d"
+
     storeDir "${params.store_dir}"
 
     output:
-    path "${params.uniref}", emit: uniref_db, type: 'dir'
+    path "uniref", emit: uniref_db, type: 'dir'
 
     script:
     """
-    humann_databases --download uniref ${params.uniref} ${params.uniref}
+    humann_databases --update-config no --download uniref ${params.uniref} .
     """
 }
 
 
 process humann {
-    publishDir '${params.publish_dir}/humann'
+    publishDir "${params.publish_dir}/humann"
     cpus 8
+    time "7d"
+    memory "32g"
 
     input:
     path fastq
@@ -171,25 +186,27 @@ process humann {
     path uniref_db
     
     output:
-    "humann/**"
+    path "out*.tsv"
+    path "files.txt"
 
     script:
     """
     humann -i ${fastq} \
-        -o 'humann' \
+        -o '.' \
         --verbose \
         --metaphlan-options "-t rel_ab --index latest" \
         --nucleotide-database ${chocophlan_db} \
         --taxonomic-profile ${metaphlan_bugs_list} \
         --protein-database ${uniref_db} \
         --threads ${task.cpus}
+    find . > files.txt
     """
 }
 
 
 workflow {
     fasterq_dump(Channel.from(params.runs))
-    concat_fastq(fasterq_dump.out.fastq_files.collect())
+    concat_fastq(fasterq_dump.out.fastq_files)
     install_metaphlan_db()
     uniref_db()
     chocophlan_db()

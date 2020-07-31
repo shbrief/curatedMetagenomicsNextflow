@@ -14,12 +14,13 @@ RUN conda config --add channels conda-forge
 RUN conda update conda
 RUN conda install -c bioconda metaphlan=3
 RUN conda install -c biobakery humann=3
+RUN conda install bowtie2=2.3.5.1
 
 ## install sratoolkit
 RUN mkdir /tmp/sra
 WORKDIR /tmp/sra
 
-RUN curl -O https://ftp-trace.ncbi.nlm.nih.gov/sra/sdk/2.10.5/setup-apt.sh
+RUN curl -O https://ftp-trace.ncbi.nlm.nih.gov/sra/sdk/2.10.8/setup-apt.sh
 RUN /bin/bash setup-apt.sh
 ENV PATH=/usr/local/ncbi/sra-tools/bin:$PATH
 
@@ -40,6 +41,9 @@ RUN wget -O bowtie2-linux-x86_64.zip https://sourceforge.net/projects/bowtie-bio
 RUN apt-get install -y unzip
 RUN unzip bowtie2-linux-x86_64.zip
 ENV PATH=/usr/local/bowtie2-2.4.1-linux-x86_64:$PATH
+
+# install ps for nextflow task monitoring
+RUN apt-get update && apt-get install -y procps
 
 ## root directory for databases
 ENV mpa_dir=/usr/local/miniconda3/lib/python3.7/site-packages/metaphlan
